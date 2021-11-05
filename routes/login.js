@@ -12,6 +12,7 @@ const jwt = require('jsonwebtoken');
 const randtoken = require('rand-token');
 const JwtStrategy = require('passport-jwt').Strategy;
 const ExtractJwt = require('passport-jwt').ExtractJwt;
+const Panels = require('../models/panels')
 const passportOpts = {
     jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
     secretOrKey: process.env.SECRET
@@ -95,6 +96,44 @@ router.post('/addAuthorization/:authId', async (req, res) => {
     try {
         const authUser = await User.findById(req.params.authId)
         authUser.authorizedTo.push(req.body)
+        await authUser.save()
+        const authUserPop = await User.findById(req.params.authId).populate({
+            path: 'authorizedTo',
+            populate: {
+                path: 'selectedGrade',
+            },
+        })
+            .populate({
+                path: 'authorizedTo',
+                populate: {
+                    path: 'selectedProject',
+                },
+            })
+            .populate({
+                path: 'authorizedTo',
+                populate: {
+                    path: 'selectedDepartment',
+                },
+            })
+            .populate('selectedProject')
+            .populate('selectedGrade')
+            .populate('selectedDepartment')
+            .exec()
+        res.json(authUserPop)
+    } catch (err) {
+        console.error(err)
+    }
+})
+
+router.post('/removeAuthorization/:authId', async (req, res) => {
+    try {
+        const authUser = await User.findById(req.params.authId)
+        console.log(req.body._id);
+        var index = authUser.authorizedTo.indexOf(req.body._id);
+         if (index > -1) {
+            authUser.authorizedTo.splice(index, 1);
+        }
+        console.log(authUser.authorizedTo)
         await authUser.save()
         const authUserPop = await User.findById(req.params.authId).populate({
             path: 'authorizedTo',
@@ -493,6 +532,25 @@ router.post('/logout', async (req, res) => {
     }
 })
 
+router.get('/panels/:projectId', async (req, res) => {
+    try {
+        const panels = await Panels.findOne({ project: req.params.projectId })
+        res.json(panels)
+    } catch(err) {
+        console.log(err)
+        res.sendStatus(400)
+    }
+})
+
+router.post('/panels/add/:projectId', async (req, res) => {
+    try {
+        
+    } catch(err) {
+        console.log(err)
+        res.sendStatus(400)
+    }
+})
+
 
 router.post('/refresh', async (req, res) => {
     console.log('API HIT')
@@ -734,6 +792,7 @@ router.put('/project/update', async (req, res) => {
     try {
         project = await Project.findById(req.body.selectedItem)
         project.viewValue = req.body.update
+        project.projectCode = req.body.projectCode
         await project.save()
             .then(item => {
                 res.json(item)

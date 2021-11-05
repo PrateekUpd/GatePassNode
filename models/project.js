@@ -5,6 +5,10 @@ const projectSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    projectCode: {
+        type: String,
+        required: true
+    },
     gates: [{
         viewValue: {
             type: String

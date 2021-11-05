@@ -4,7 +4,7 @@ const GatePass = require('./gatePass')
 
 const gpArraySchema = new mongoose.Schema({
     gatePassNo: {
-        type: Number,
+        type: String,
         required: true
     },
     createdAt: {
@@ -92,8 +92,16 @@ const gpArraySchema = new mongoose.Schema({
             required: true
         },
         quantityRet: {
-            type: Number
+            type: Number,
         },
+        // quantityRet: [{
+        //     amount: {
+        //         type: Number
+        //     },
+        //     retDate: {
+        //         type: Date
+        //     }
+        // }],
         unit: {
             type: mongoose.Schema.Types.ObjectId,
             required: true,

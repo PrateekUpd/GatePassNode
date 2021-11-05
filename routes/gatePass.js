@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router()
 const GatePass = require('../models/gatePass')
 const GpArray = require('../models/gpArray')
+const Project = require('../models/project')
 const CreateForm = require('../models/createForm')
 const department = require('../models/department')
 const User = require('../models/user');
@@ -85,10 +86,34 @@ const User = require('../models/user');
 //     }
 // })
 
+router.get('/chart/:project', async (req, res) => {
+  let data = {
+    series: [0, 0, 0, 0, 0],
+    labels: ['Created', 'Authorized', 'Exited', 'Returned', 'Partially Returned']
+  }
+  let query = GpArray.find()
+  query = query.where('createForm.selectedProject', req.params.project)
+  let today = new Date()
+  let dateStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  query = query.lte('createdAt', today)
+  query = query.gte('createdAt', dateStart)
+  try {
+    const gpArrays = await query
+    for(let gpArray of gpArrays) {
+      const index = data.labels.indexOf(gpArray.status);
+      data.series[index] += 1;
+    }
+    res.json(data)
+  } catch(err) {
+    console.log(err)
+    res.json('Not able to find Gate Passes')
+  }
+})
 
 
 router.get('/search/:no/:print/:project', async (req, res) => {
   console.log(req.params)
+
   let query = GpArray.find()
   if (req.params.print === '1') {
     query = query.where('status', 'Authorized')
@@ -96,7 +121,7 @@ router.get('/search/:no/:print/:project', async (req, res) => {
   query = query.where('createForm.selectedProject', req.params.project)
   // searchOptions.status = req.params.status,
   // searchOptions.selectedType = req.params.type
-  query = query.where('gatePassNo', parseInt(req.params.no))
+  query = query.where('gatePassNo', { $regex: req.params.no}).limit(5)
   try {
     const gpArrays = await query
       .populate({
@@ -185,24 +210,34 @@ router.get('/search/:no/:print/:project', async (req, res) => {
 
 router.post('/GpArray/add', async (req, res) => {
   let searchOptions = {}
-  let mySort = { gatePassNo: -1 }
+  let mySort = { createdAt: -1 }
   let lgpArray
-  let gatePassNoAssign
+  let project
+  let gatePassNoString
+  let date = new Date()
+  let year = date.getFullYear();
+  let query = GpArray.find()
+  let query2 = Project.findOne()
+  query = query.where('createForm.selectedProject', req.body.createForm.selectedProject)
+  query2 = query2.where('_id', req.body.createForm.selectedProject)
   try {
-    lgpArray = await GpArray.find(searchOptions).sort(mySort).limit(1)
+    lgpArray = await query.sort(mySort).limit(1)
+    project = await query2
   } catch (err) {
     console.log(err)
   }
   console.log('lgpArray[0] ', lgpArray[0])
   if (lgpArray[0] === undefined) {
-    gatePassNoAssign = 1
+    gatePassNoString = year.toString() + '-' + project.projectCode + '-' + '1'
   }
   else {
-    gatePassNoAssign = lgpArray[0].gatePassNo + 1
-    console.log(gatePassNoAssign, 'GatePassNoAssign')
+    gatePassNoArray = lgpArray[0].gatePassNo.split('-')
+    gatePassNoNumber = parseInt(gatePassNoArray[2]) + 1
+    gatePassNoString = year.toString() + '-' + project.projectCode + '-' + gatePassNoNumber.toString()
+    console.log(gatePassNoString, 'GatePassNoString')
   }
   const gpArray = new GpArray(req.body);
-  gpArray.gatePassNo = gatePassNoAssign
+  gpArray.gatePassNo = gatePassNoString
   try {
     await gpArray.save()
     gpArray2 = await GpArray.findById(gpArray._id).populate({
@@ -267,7 +302,7 @@ router.post('/GpArray/inbox', async (req, res) => {
   // for(var i=0; i<arrLength; i++) {
   //   query = query.where('createdBy', req.body[i])
   // }
-  for (const authTo of req.body) {
+  for (let authTo of req.body) {
     query = query.where('createdBy', authTo)
   }
   query = query.where('status', 'Created')
